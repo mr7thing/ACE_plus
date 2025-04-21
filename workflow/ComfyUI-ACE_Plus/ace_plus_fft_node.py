@@ -379,7 +379,7 @@ class AcePlusFFTProcessor:
             slice_w = 0
 
         H, W = edit_image.shape[-2:]
-        scale = min(1.0, math.sqrt(self.max_seq_len * 2 / ((H / self.d) * (W / self.d))))
+        scale = min(1.0, math.sqrt(self.max_seq_len / ((H / self.d) * (W / self.d))))
         rH = int(H * scale) // self.d * self.d
         rW = int(W * scale) // self.d * self.d
         slice_w = int(slice_w * scale) // self.d * self.d
