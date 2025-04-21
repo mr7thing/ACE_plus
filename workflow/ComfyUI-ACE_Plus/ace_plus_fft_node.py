@@ -391,7 +391,7 @@ class AcePlusFFTProcessor:
         edit_image = edit_image * (1 - edit_mask)
         edit_image = edit_image.unsqueeze(0).permute(0, 2, 3, 1)
         change_image = change_image.unsqueeze(0).permute(0, 2, 3, 1)
-        slice_w = slice_w if slice_w < 30 else slice_w + 30
+        slice_w = slice_w if slice_w > 30 else slice_w + 30
 
         return edit_image + 0.5, change_image + 0.5, edit_mask, out_h, out_w, slice_w
 
