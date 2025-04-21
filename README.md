@@ -476,7 +476,7 @@ Copy the workflow/ComfyUI-ACE_Plus folder into ComfyUI’s custom_nodes director
 <table>
 
 As shown in the figure below, max_seq_length controls the length of the token sequence during inference, thereby controlling the model's inference memory consumption. 
-The range of this value is from 1024 to 5120, and it correspondingly affects the clarity of the generated image. The smaller the value, the lower the image clarity.
+The range of this value is from 2048 to 8192, and it correspondingly affects the clarity of the generated image. The smaller the value, the lower the image clarity.
 
 <img src="./assets/comfyui/snapshot.jpg" width="200">
 
