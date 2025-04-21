@@ -26,15 +26,14 @@ def transform_image(image, std = 0.5, mean = 0.5):
     return (image.permute(2, 0, 1)/255. - mean)/std
 def transform_mask(mask):
     return mask.unsqueeze(0)/255.
+    
 def ensure_src_align_target_h_mode(src_image, size, image_id, interpolation=InterpolationMode.BILINEAR):
     # padding mode
     H, W = size
     ret_image = []
     for one_id in image_id:
         edit_image = src_image[one_id]
-        _, eH, eW = edit_image.shape
-        scale = H/eH
-        tH, tW = H, int(eW * scale)
+        tH, tW = H, W
         ret_image.append(T.Resize((tH, tW), interpolation=interpolation, antialias=True)(edit_image))
     return ret_image
 
