@@ -22,7 +22,7 @@ def edit_preprocess(processor, device, edit_image, edit_mask):
     return Image.composite(new_edit_image, edit_image, edit_mask)
 
 class ACEPlusImageProcessor():
-    def __init__(self, max_aspect_ratio=4, d=16, max_seq_len=1024):
+    def __init__(self, max_aspect_ratio=4, d=16, max_seq_len=2048):
         self.max_aspect_ratio = max_aspect_ratio
         self.d = d
         self.max_seq_len = max_seq_len
@@ -106,7 +106,7 @@ class ACEPlusImageProcessor():
             slice_w = 0
 
         H, W = edit_image.shape[-2:]
-        scale = min(1.0, math.sqrt(self.max_seq_len * 2 / ((H / self.d) * (W / self.d))))
+        scale = min(1.0, math.sqrt(self.max_seq_len / ((H / self.d) * (W / self.d))))
         rH = int(H * scale) // self.d * self.d  # ensure divisible by self.d
         rW = int(W * scale) // self.d * self.d
         slice_w = int(slice_w * scale) // self.d * self.d
