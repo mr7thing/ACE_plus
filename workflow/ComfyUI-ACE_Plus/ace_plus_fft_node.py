@@ -208,6 +208,7 @@ class AcePlusFFTProcessor:
         return {
             'required': {
                 'use_reference': ('BOOLEAN', {'default': True}),
+                'disable_internal_scaling': ('BOOLEAN', {'default': False}),
                 'height': ('INT', {
                     'default': 1024,
                     'min': 256,
@@ -307,7 +308,53 @@ class AcePlusFFTProcessor:
                    height=1024,
                    width=1024,
                    keep_pixels_rate=0.8,
-                   max_seq_length=4096):
+                   max_seq_length=4096,
+                   disable_internal_scaling=False):
+
+        if edit_image is None:
+            # If no edit_image, create a default one for reference generation
+            uc_image, c_image, mask, out_h, out_w, slice_w = self._process_single(
+                reference_image, None, None, use_reference, task_type, height, width, keep_pixels_rate, max_seq_length,
+                disable_internal_scaling
+            )
+            return (uc_image, c_image, mask, out_h, out_w, slice_w)
+
+        batch_size = edit_image.shape[0]
+        processed_uc_images = []
+        processed_c_images = []
+        processed_masks = []
+
+        # We assume all images in the batch will have the same output dimensions
+        out_h, out_w, slice_w = -1, -1, -1
+
+        for i in range(batch_size):
+            single_edit_image = edit_image[i:i+1]
+            # Handle optional inputs for the batch
+            single_ref_image = reference_image[i:i+1] if reference_image is not None and reference_image.shape[0] == batch_size else reference_image
+            single_mask = edit_mask[i:i+1] if edit_mask is not None and edit_mask.shape[0] == batch_size else edit_mask
+
+            uc_img, c_img, mask, h, w, s_w = self._process_single(
+                single_ref_image, single_edit_image, single_mask,
+                use_reference, task_type, height, width,
+                keep_pixels_rate, max_seq_length, disable_internal_scaling
+            )
+
+            processed_uc_images.append(uc_img)
+            processed_c_images.append(c_img)
+            processed_masks.append(mask)
+
+            # Store dimensions from the first image
+            if i == 0:
+                out_h, out_w, slice_w = h, w, s_w
+
+        # Combine results into a single batch tensor
+        final_uc_images = torch.cat(processed_uc_images, dim=0)
+        final_c_images = torch.cat(processed_c_images, dim=0)
+        final_masks = torch.cat(processed_masks, dim=0)
+
+        return (final_uc_images, final_c_images, final_masks, out_h, out_w, slice_w)
+
+    def _process_single(self, reference_image, edit_image, edit_mask, use_reference, task_type, height, width, keep_pixels_rate, max_seq_length, disable_internal_scaling):
         self.max_seq_len = max_seq_length
         if not use_reference and edit_image is not None:
             reference_image = None
@@ -379,10 +426,16 @@ class AcePlusFFTProcessor:
             slice_w = 0
 
         H, W = edit_image.shape[-2:]
-        scale = min(1.0, math.sqrt(self.max_seq_len / ((H / self.d) * (W / self.d))))
-        rH = int(H * scale) // self.d * self.d
-        rW = int(W * scale) // self.d * self.d
-        slice_w = int(slice_w * scale) // self.d * self.d
+        if disable_internal_scaling:
+            rH, rW = H, W
+            # When scaling is disabled, slice_w should be based on the original width, not scaled.
+            # We still need to ensure it's divisible by self.d
+            slice_w = int(slice_w) // self.d * self.d
+        else:
+            scale = min(1.0, math.sqrt(self.max_seq_len * 2 / ((H / self.d) * (W / self.d))))
+            rH = int(H * scale) // self.d * self.d
+            rW = int(W * scale) // self.d * self.d
+            slice_w = int(slice_w * scale) // self.d * self.d
 
         edit_image = T.Resize((rH, rW), interpolation=T.InterpolationMode.NEAREST_EXACT, antialias=True)(edit_image)
         edit_mask = T.Resize((rH, rW), interpolation=T.InterpolationMode.NEAREST_EXACT, antialias=True)(edit_mask)
@@ -391,7 +444,7 @@ class AcePlusFFTProcessor:
         edit_image = edit_image * (1 - edit_mask)
         edit_image = edit_image.unsqueeze(0).permute(0, 2, 3, 1)
         change_image = change_image.unsqueeze(0).permute(0, 2, 3, 1)
-        slice_w = slice_w if slice_w > 30 else slice_w + 30
+        slice_w = slice_w if slice_w < 30 else slice_w + 30
 
         return edit_image + 0.5, change_image + 0.5, edit_mask, out_h, out_w, slice_w
 
